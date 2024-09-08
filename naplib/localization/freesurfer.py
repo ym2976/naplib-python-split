@@ -108,6 +108,10 @@ num2region = {
     80: "O_mSTG",
     81: "O_pSTG",
     82: "O_IFG",
+    83: "O_mMTG",
+    84: "O_pMTG",
+    85: "O_mITG",
+    86: "O_pITG",
 }
 region2num = {v: k for k, v in num2region.items()}
 
@@ -337,6 +341,10 @@ class Hemisphere:
                 "STG": ["G_temp_sup-Lateral"],
                 "mSTG": ["O_mSTG"],
                 "pSTG": ["O_pSTG"],
+                "mMTG": ["O_mMTG"],
+                "pMTG": ["O_pMTG"],
+                "mITG": ["O_mITG"],
+                "pITG": ["O_pITG"],
                 "STS": ["S_temporal_sup"],
                 "IFG": ["O_IFG"],
                 "IFG.opr": ["G_front_inf-Opercular"],
@@ -477,7 +485,76 @@ class Hemisphere:
         plane = Plane.from_vectors(points.mean(0), line.direction, [0, 0, 1])
         plane.normal = -plane.normal if plane.normal[1] < 0 else plane.normal
         return plane
+    def split_itg(self, method="midpoint"):
+        """
+        Split HG vertices into subregions, such as posteromedial (pmHG) and anterolateral (alHG) halves.
 
+        Parameters
+        ----------
+        method : {'midpoint', 'endpoint', 'median', 'te1x', 'six_four', or 'seven_three'}, default='midepoint'
+            How to split the region.
+
+        Returns
+        -------
+        self : instance of self
+        """
+        
+
+        if self.atlas == 'MNI152':
+            raise ValueError(f'split_mtg() is not supported for MNI atlas.')
+            
+        itg = self.filter_labels(["G_temporal_inf", "ITG"])
+
+        if method == "midpoint":
+            # Fit line to HG and project vertices to line
+            position = self.fit_ml_line(self.coords[itg]).transform_points(
+                self.coords[itg]
+            )
+            midpoint = np.mean((min(position), max(position)))
+            # Split HG using midpoint of line
+            medial = position <= midpoint
+            self.labels[np.where(itg)[0][medial]] = self.label2num[
+                "pITG" if self.simplified else "O_pITG"
+            ]
+            self.labels[np.where(itg)[0][~medial]] = self.label2num[
+                "mITG" if self.simplified else "O_mITG"
+            ]
+        return self
+    def split_mtg(self, method="midpoint"):
+        """
+        Split HG vertices into subregions, such as posteromedial (pmHG) and anterolateral (alHG) halves.
+
+        Parameters
+        ----------
+        method : {'midpoint', 'endpoint', 'median', 'te1x', 'six_four', or 'seven_three'}, default='midepoint'
+            How to split the region.
+
+        Returns
+        -------
+        self : instance of self
+        """
+        
+
+        if self.atlas == 'MNI152':
+            raise ValueError(f'split_mtg() is not supported for MNI atlas.')
+            
+        mtg = self.filter_labels(["G_temporal_middle", "MTG"])
+
+        if method == "midpoint":
+            # Fit line to HG and project vertices to line
+            position = self.fit_ml_line(self.coords[mtg]).transform_points(
+                self.coords[mtg]
+            )
+            midpoint = np.mean((min(position), max(position)))
+            # Split HG using midpoint of line
+            medial = position <= midpoint
+            self.labels[np.where(mtg)[0][medial]] = self.label2num[
+                "pMTG" if self.simplified else "O_pMTG"
+            ]
+            self.labels[np.where(mtg)[0][~medial]] = self.label2num[
+                "mMTG" if self.simplified else "O_mMTG"
+            ]
+        return self
     def split_hg(self, method="midpoint"):
         """
         Split HG vertices into subregions, such as posteromedial (pmHG) and anterolateral (alHG) halves.
@@ -902,7 +979,20 @@ class Brain:
         self.lh.split_stg(method)
         self.rh.split_stg(method)
         return self
-
+    def split_mtg(self, method="midpoint"):
+        """
+        Split STG into middle (mSTG) and posterior (pSTG) halves.
+        """
+        self.lh.split_mtg(method)
+        self.rh.split_mtg(method)
+        return self
+    def split_itg(self, method="midpoint"):
+        """
+        Split STG into middle (mSTG) and posterior (pSTG) halves.
+        """
+        self.lh.split_itg(method)
+        self.rh.split_itg(method)
+        return self
     def remove_tts(self, method="split"):
         """
         Convert TTS labels into either HG or PT ones.
